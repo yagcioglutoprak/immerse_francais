@@ -1,11 +1,99 @@
-# 🇫🇷 ImmerseFrançais - Extension Chrome d'Apprentissage du Français
+# 🇫🇷 ImmerseFrançais - Chrome Extension for French Learning
 
-Une extension Chrome innovante pour apprendre le vocabulaire français de manière immersive en naviguant sur le web.
+An innovative Chrome extension for learning French vocabulary immersively while browsing the web. Automatically detects, highlights, and translates French words with AI-powered assistance.
 
-## 📋 Statut du Développement
+## ✨ Features
 
-### ✅ Phase 2 Terminée : Interface Utilisateur de Base
+### 🎯 Smart Word Detection & Highlighting
+- **Automatic French word detection** on any webpage
+- **Visual highlighting** with different colors for saved/unsaved words
+- **Real-time DOM observation** for dynamic content updates
+- **Intelligent filtering** to exclude common words and focus on learning vocabulary
 
+### 🤖 AI-Powered Translation (Google Gemini API)
+- **Complete word analysis** including:
+  - English translation
+  - Example sentences in French
+  - Word type (noun, verb, adjective, etc.)
+  - Language register (formal, informal, etc.)
+  - Etymology and frequency information
+  - Contextual tags
+- **Smart caching** to avoid redundant API calls
+- **Error handling** with fallback options
+
+### 💾 Personal Vocabulary Management
+- **Save words** with personal notes and translations
+- **Priority system** with 5-star rating
+- **Quick tooltip preview** for saved words on hover
+- **Export/Import** functionality for backup and sharing
+- **Cross-tab synchronization** of saved vocabulary
+
+### 🎵 Interactive Learning Features
+- **Audio pronunciation** using Web Speech API
+- **Detailed modal interface** for in-depth word study
+- **Smart positioning** to avoid screen edges
+- **Keyboard shortcuts** (Ctrl+Enter to save, Escape to close)
+
+### ⚡ Performance & UX
+- **Floating activation button** with visual feedback
+- **Optimized processing** for large pages with batch operations
+- **Anti-flicker protection** during DOM updates
+- **Responsive design** that adapts to screen size
+- **Global state management** across all browser tabs
+
+## 🚀 Installation
+
+### Method 1: Developer Mode (Recommended for testing)
+1. Open Chrome and navigate to `chrome://extensions/`
+2. Enable "Developer mode" (top right toggle)
+3. Click "Load unpacked"
+4. Select the `extension_de_apprendre_le_francais` folder
+
+### Method 2: Install from Chrome Web Store
+*Coming soon...*
+
+## ⚙️ Configuration
+
+### 1. Get Your Google Gemini API Key
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a new API key
+3. Copy the generated key
+
+### 2. Configure the Extension
+1. Click the extension icon in your browser toolbar
+2. Click "⚙️ Configuration" 
+3. Paste your API key in the configuration field
+4. Click "Save and Test Connection"
+5. Wait for the green confirmation message
+
+## 📱 How to Use
+
+### Basic Usage
+1. **Activate the extension**: Click the floating 🇫🇷 button on any webpage
+2. **Browse French content**: Visit any French website (news, blogs, etc.)
+3. **Interact with words**: 
+   - **Click** any highlighted word to open the translation modal
+   - **Hover** over saved words to see your notes
+4. **Save vocabulary**: Add personal notes and set priority levels
+
+### Advanced Features
+- **Global activation**: Use the popup to enable/disable across all tabs
+- **Export your data**: Use the options page to backup your vocabulary
+- **Keyboard shortcuts**: 
+  - `Ctrl+Enter` in note field to save quickly
+  - `Escape` to close modals
+- **Audio pronunciation**: Click the 🔊 button in word modals
+
+## 🔧 Technical Details
+
+### Architecture
+```
+├── manifest.json          # Extension configuration (Manifest V3)
+├── content.js             # Main content script (DOM manipulation, UI)
+├── background.js          # Service worker (API calls, storage)
+├── popup.html/js          # Extension popup interface
+├── options.html/js        # Configuration page
+├── style.css              # Comprehensive styling
 #### Fonctionnalités Implémentées :
 - **Bouton flottant d'activation** : Visible en bas à droite de chaque page
   - États visuels : bleu (actif) / gris (inactif)
@@ -39,7 +127,7 @@ Une extension Chrome innovante pour apprendre le vocabulaire français de maniè
    - Entrez la clé et cliquez sur "Sauvegarder"
    - Testez la connexion avec le bouton "Tester la connexion"
 
-### 3. Utilisation (Phase 2)
+### 3. Utilisation
 
 1. **Activer l'extension** :
    - Visitez n'importe quel site web (ex: lemonde.fr)
@@ -64,49 +152,7 @@ extension_de_apprendre_le_francais/
 └── icons/                 # Icônes de l'extension
 ```
 
-## 🎯 Phases de Développement
 
-### ✅ Phase 1: Configuration de Base et Architecture
-- Structure du projet
-- Manifest.json avec permissions
-- Fichiers de base créés
-
-### ✅ Phase 2: Interface Utilisateur de Base
-- **Bouton flottant d'activation/désactivation**
-- **Page d'options pour la clé API Gemini**
-- **Popup avec statistiques et contrôles**
-- Gestion de l'état par onglet/domaine
-
-### 🔄 Phase 3: Analyse et Surlignage du Texte (À venir)
-- Détection et surlignage des mots français
-- Distinction mots sauvegardés/non sauvegardés
-
-### 🔄 Phase 4: Intégration API Gemini (À venir)
-- Appels API pour traduction et exemples
-- Gestion du cache et des erreurs
-
-### 🔄 Phase 5: Fenêtre Modale d'Interaction (À venir)
-- Modal de traduction au clic sur un mot
-- Sauvegarde des notes personnelles
-
-## 🧪 Test de la Phase 2
-
-Pour vérifier que la Phase 2 fonctionne correctement :
-
-1. **Test du bouton flottant** :
-   - Le bouton 🇫🇷 apparaît en bas à droite
-   - Il change de couleur (gris → bleu) quand activé
-   - L'état est sauvegardé par domaine
-
-2. **Test de la page d'options** :
-   - Accessible via le popup ou `chrome://extensions/`
-   - Permet de sauvegarder une clé API
-   - Test de connexion fonctionnel
-
-3. **Test du popup** :
-   - Affiche les statistiques correctes
-   - Permet d'activer/désactiver par onglet
-   - Synchronisation avec le bouton flottant
 
 ## 📝 Notes Techniques
 
@@ -115,12 +161,7 @@ Pour vérifier que la Phase 2 fonctionne correctement :
 - **Permissions** : `storage`, `activeTab`, `scripting`, `host_permissions`
 - **Compatibilité** : Manifest V3, Chrome moderne
 
-## 🔜 Prochaines Étapes
 
-La Phase 3 implémentera :
-- Analyse automatique du texte des pages web
-- Surlignage interactif des mots français
-- Performance optimisée pour les grandes pages
 
 ---
 
