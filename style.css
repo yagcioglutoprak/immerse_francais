@@ -56,12 +56,12 @@
   box-shadow: 0 6px 16px var(--immerse-shadow) !important;
 }
 
-/* Surlignage des mots */
+/* Surlignage des mots - Version améliorée pour meilleure lisibilité */
 .immerse-word-highlight {
   cursor: pointer !important;
   transition: all 0.2s ease !important;
-  border-radius: 2px !important;
-  padding: 0 1px !important;
+  border-radius: 3px !important;
+  padding: 1px 2px !important;
   display: inline !important;
   font-family: inherit !important;
   font-size: inherit !important;
@@ -69,34 +69,90 @@
   text-decoration: inherit !important;
   line-height: inherit !important;
   color: inherit !important;
-  border: none !important;
   outline: none !important;
-  box-shadow: none !important;
   text-shadow: none !important;
+  position: relative !important;
+  /* Amélioration de la lisibilité avec ombres subtiles */
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
 }
 
 .immerse-word-highlight.not-saved {
-  background-color: var(--immerse-primary-light) !important;
-  box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.1) !important;
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15), rgba(25, 118, 210, 0.25)) !important;
+  box-shadow: 0 1px 3px rgba(25, 118, 210, 0.15) !important;
 }
 
 .immerse-word-highlight.saved {
-  background-color: var(--immerse-secondary-light) !important;
-  box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.1) !important;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.18), rgba(76, 175, 80, 0.28)) !important;
+  box-shadow: 0 1px 3px rgba(76, 175, 80, 0.15) !important;
 }
 
 .immerse-word-highlight:hover {
-  opacity: 0.9 !important;
+  opacity: 1 !important;
   transform: none !important;
-  filter: brightness(0.95) !important;
+  filter: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .immerse-word-highlight.not-saved:hover {
-  background-color: #BBDEFB !important;
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.25), rgba(25, 118, 210, 0.35)) !important;
 }
 
 .immerse-word-highlight.saved:hover {
-  background-color: #C8E6C9 !important;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.28), rgba(76, 175, 80, 0.38)) !important;
+}
+
+/* Adaptations pour les thèmes sombres */
+@media (prefers-color-scheme: dark) {
+  .immerse-word-highlight.not-saved {
+    background: linear-gradient(135deg, rgba(100, 181, 246, 0.25), rgba(100, 181, 246, 0.35)) !important;
+    box-shadow: 0 1px 3px rgba(100, 181, 246, 0.2) !important;
+  }
+
+  .immerse-word-highlight.saved {
+    background: linear-gradient(135deg, rgba(129, 199, 132, 0.25), rgba(129, 199, 132, 0.35)) !important;
+    box-shadow: 0 1px 3px rgba(129, 199, 132, 0.2) !important;
+  }
+
+  .immerse-word-highlight.not-saved:hover {
+    background: linear-gradient(135deg, rgba(100, 181, 246, 0.35), rgba(100, 181, 246, 0.45)) !important;
+    border-color: rgba(100, 181, 246, 0.7) !important;
+  }
+
+  .immerse-word-highlight.saved:hover {
+    background: linear-gradient(135deg, rgba(129, 199, 132, 0.35), rgba(129, 199, 132, 0.45)) !important;
+    border-color: rgba(129, 199, 132, 0.7) !important;
+  }
+}
+
+/* Adaptations pour les sites avec fond sombres (détection automatique) */
+.immerse-dark-bg .immerse-word-highlight.not-saved {
+  background: linear-gradient(135deg, rgba(100, 181, 246, 0.3), rgba(100, 181, 246, 0.4)) !important;
+  border-color: rgba(100, 181, 246, 0.6) !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+.immerse-dark-bg .immerse-word-highlight.saved {
+  background: linear-gradient(135deg, rgba(129, 199, 132, 0.3), rgba(129, 199, 132, 0.4)) !important;
+  border-color: rgba(129, 199, 132, 0.6) !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Adaptations pour les sites avec fond très clairs */
+.immerse-light-bg .immerse-word-highlight.not-saved {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.2), rgba(25, 118, 210, 0.3)) !important;
+  border-color: rgba(25, 118, 210, 0.5) !important;
+  color: #000000 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+}
+
+.immerse-light-bg .immerse-word-highlight.saved {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.3)) !important;
+  border-color: rgba(76, 175, 80, 0.5) !important;
+  color: #000000 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Modal Box compacte - Design moderne avec étoiles */
@@ -115,8 +171,6 @@
   flex-direction: column !important;
   overflow: hidden !important;
 }
-
-
 
 @keyframes immerse-modal-pop-in {
   from {

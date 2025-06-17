@@ -13,6 +13,7 @@ let domObserver = null;
 let isModalOpen = false; // Nouvelle variable pour tracker l'état de la modal
 let currentModalWord = null; // Mot actuellement affiché dans la modal
 let currentTranslationRequest = null; // Requête de traduction en cours
+let backgroundTheme = 'auto'; // Thème détecté automatiquement: 'light', 'dark', 'auto'
 
 // Initialisation du script
 async function initializeExtension() {
@@ -368,6 +369,9 @@ function analyzeAndHighlightWords() {
     try {
         // Nettoyer les anciens surlignages avant de commencer
         cleanupHighlighting();
+        
+        // Détecter et appliquer le thème adapté pour une meilleure lisibilité
+        applyThemeToHighlights();
         
         // Obtenir tous les nœuds de texte de la page
         const textNodes = getTextNodes(document.body);
@@ -1844,9 +1848,150 @@ function setupContentExpansion(modalElement) {
     });
 }
 
+// Détecter le thème de fond du site pour adapter les couleurs
+function detectBackgroundTheme() {
+    try {
+        // Obtenir la couleur de fond de l'élément body
+        const bodyStyles = window.getComputedStyle(document.body);
+        const backgroundColor = bodyStyles.backgroundColor;
+        
+        // Si pas de couleur de fond définie, vérifier l'élément HTML
+        if (!backgroundColor || backgroundColor === 'rgba(0, 0, 0, 0)' || backgroundColor === 'transparent') {
+            const htmlStyles = window.getComputedStyle(document.documentElement);
+            const htmlBackgroundColor = htmlStyles.backgroundColor;
+            
+            if (htmlBackgroundColor && htmlBackgroundColor !== 'rgba(0, 0, 0, 0)' && htmlBackgroundColor !== 'transparent') {
+                return analyzeBackgroundColor(htmlBackgroundColor);
+            }
+        } else {
+            return analyzeBackgroundColor(backgroundColor);
+        }
+        
+        // Analyser quelques éléments textuels pour détecter le thème
+        const textElements = document.querySelectorAll('p, div, span, h1, h2, h3, article, main');
+        let darkBackgroundCount = 0;
+        let lightBackgroundCount = 0;
+        
+        for (let i = 0; i < Math.min(10, textElements.length); i++) {
+            const element = textElements[i];
+            const styles = window.getComputedStyle(element);
+            const bgColor = styles.backgroundColor;
+            
+            if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+                const theme = analyzeBackgroundColor(bgColor);
+                if (theme === 'dark') darkBackgroundCount++;
+                else if (theme === 'light') lightBackgroundCount++;
+            }
+        }
+        
+        // Retourner le thème le plus fréquent ou 'auto' par défaut
+        if (darkBackgroundCount > lightBackgroundCount) {
+            return 'dark';
+        } else if (lightBackgroundCount > darkBackgroundCount) {
+            return 'light';
+        }
+        
+        return 'auto';
+        
+    } catch (error) {
+        console.warn('Erreur lors de la détection du thème:', error);
+        return 'auto';
+    }
+}
+
+// Analyser une couleur de fond et déterminer si elle est claire ou sombre
+function analyzeBackgroundColor(colorString) {
+    try {
+        // Convertir la couleur en RGB
+        let r, g, b;
+        
+        if (colorString.startsWith('rgb(')) {
+            const rgbMatch = colorString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (rgbMatch) {
+                [, r, g, b] = rgbMatch.map(Number);
+            }
+        } else if (colorString.startsWith('rgba(')) {
+            const rgbaMatch = colorString.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/);
+            if (rgbaMatch) {
+                [, r, g, b] = rgbaMatch.map(Number);
+            }
+        } else if (colorString.startsWith('#')) {
+            const hex = colorString.slice(1);
+            r = parseInt(hex.substr(0, 2), 16);
+            g = parseInt(hex.substr(2, 2), 16);
+            b = parseInt(hex.substr(4, 2), 16);
+        } else {
+            return 'auto'; // Couleur non reconnue
+        }
+        
+        // Calculer la luminance relative (formule W3C)
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        
+        // Thème sombre si la luminance est faible (inférieures à 0.5)
+        return luminance < 0.5 ? 'dark' : 'light';
+        
+    } catch (error) {
+        console.warn('Erreur lors de l\'analyse de la couleur:', colorString, error);
+        return 'auto';
+    }
+}
+
+// Appliquer les classes de thème aux éléments surlignés
+function applyThemeToHighlights() {
+    const theme = detectBackgroundTheme();
+    backgroundTheme = theme;
+    
+    // Supprimer les anciennes classes de thème du body
+    document.body.classList.remove('immerse-dark-bg', 'immerse-light-bg');
+    
+    // Appliquer la nouvelle classe selon le thème détecté
+    if (theme === 'dark') {
+        document.body.classList.add('immerse-dark-bg');
+        console.log('🌙 Thème sombre détecté - Application des styles adaptés');
+    } else if (theme === 'light') {
+        document.body.classList.add('immerse-light-bg');
+        console.log('☀️ Thème clair détecté - Application des styles adaptés');
+    } else {
+        console.log('🔄 Thème automatique - Utilisation des styles par défaut');
+    }
+}
+
 // Initialisation de l'extension au chargement de la page
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeExtension);
 } else {
     initializeExtension();
+}
+
+// Test de la détection automatique de thème
+function testThemeDetection() {
+    console.log('🔬 Test de la détection automatique de thème:');
+    
+    // Tester différentes couleurs communes
+    const testColors = [
+        { color: '#FFFFFF', expected: 'light', description: 'Blanc pur' },
+        { color: '#000000', expected: 'dark', description: 'Noir pur' },
+        { color: '#F5F5F5', expected: 'light', description: 'Gris très clair' },
+        { color: '#2D2D2D', expected: 'dark', description: 'Gris très sombre' },
+        { color: 'rgb(255, 255, 255)', expected: 'light', description: 'Blanc RGB' },
+        { color: 'rgb(30, 30, 30)', expected: 'dark', description: 'Sombre RGB' },
+        { color: 'rgba(255, 255, 255, 0.9)', expected: 'light', description: 'Blanc transparent' },
+        { color: 'rgba(50, 50, 50, 0.9)', expected: 'dark', description: 'Sombre transparent' }
+    ];
+    
+    testColors.forEach(({ color, expected, description }) => {
+        const detected = analyzeBackgroundColor(color);
+        const status = detected === expected ? '✅' : '❌';
+        console.log(`${status} ${description} (${color}) -> Détecté: ${detected}, Attendu: ${expected}`);
+    });
+    
+    // Tester la détection sur la page actuelle
+    const currentTheme = detectBackgroundTheme();
+    console.log(`🎨 Thème détecté sur cette page: ${currentTheme}`);
+    
+    // Informations sur les couleurs de fond actuelles
+    const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+    const htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+    console.log(`📄 Couleur de fond du body: ${bodyBg}`);
+    console.log(`📄 Couleur de fond du html: ${htmlBg}`);
 } 
