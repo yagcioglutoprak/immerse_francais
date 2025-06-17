@@ -94,75 +94,62 @@ An innovative Chrome extension for learning French vocabulary immersively while 
 ├── popup.html/js          # Extension popup interface
 ├── options.html/js        # Configuration page
 ├── style.css              # Comprehensive styling
-#### Fonctionnalités Implémentées :
-- **Bouton flottant d'activation** : Visible en bas à droite de chaque page
-  - États visuels : bleu (actif) / gris (inactif)
-  - Sauvegarde de l'état par domaine
-  - Animation au survol
-- **Page d'options complète** : Configuration de la clé API Gemini
-  - Interface moderne et intuitive
-  - Test de connexion à l'API
-  - Sauvegarde sécurisée des paramètres
-- **Popup de l'extension** : Interface de contrôle et statistiques
-  - Affichage du statut d'activation
-  - Compteur de mots sauvegardés
-  - Statut de la configuration API
-  - Activation/désactivation par onglet
-
-## 🚀 Installation et Test
-
-### 1. Installation en Mode Développeur
-
-1. Ouvrez Chrome et accédez à `chrome://extensions/`
-2. Activez le "Mode développeur" (en haut à droite)
-3. Cliquez sur "Charger l'extension non empaquetée"
-4. Sélectionnez le dossier du projet `extension_de_apprendre_le_francais`
-
-### 2. Configuration
-
-1. **Configurer la clé API Gemini** :
-   - Cliquez sur l'icône de l'extension dans la barre d'outils
-   - Cliquez sur "⚙️ Configuration"
-   - Suivez les instructions pour obtenir votre clé API Gemini
-   - Entrez la clé et cliquez sur "Sauvegarder"
-   - Testez la connexion avec le bouton "Tester la connexion"
-
-### 3. Utilisation
-
-1. **Activer l'extension** :
-   - Visitez n'importe quel site web (ex: lemonde.fr)
-   - Cherchez le bouton flottant 🇫🇷 en bas à droite
-   - Cliquez dessus pour l'activer (il devient bleu)
-
-2. **Contrôler depuis le popup** :
-   - Cliquez sur l'icône de l'extension dans la barre d'outils
-   - Voyez les statistiques et le statut
-   - Activez/désactivez l'extension pour la page actuelle
-
-## 🔧 Structure du Projet
-
-```
-extension_de_apprendre_le_francais/
-├── manifest.json          # Configuration de l'extension
-├── content.js             # Script d'injection (bouton flottant)
-├── background.js          # Service worker (API, stockage)
-├── popup.html/js          # Interface popup
-├── options.html/js        # Page de configuration
-├── style.css              # Styles de l'interface
-└── icons/                 # Icônes de l'extension
+└── icons/                 # Extension icons (16x16 to 128x128)
 ```
 
+### Key Technologies
+- **Manifest V3** for modern Chrome extension architecture
+- **Google Gemini API** for AI-powered translations and analysis
+- **Chrome Storage API** for persistent data with sync across devices
+- **Web Speech API** for pronunciation features
+- **Mutation Observer** for dynamic content detection
+- **CSS Grid/Flexbox** for responsive modal design
 
+### Permissions Required
+- `storage` - Save vocabulary and settings
+- `activeTab` - Access current tab content
+- `scripting` - Inject content scripts
+- `host_permissions` - Access web pages for word detection
 
-## 📝 Notes Techniques
+## 🧪 Testing
 
-- **Stockage** : `chrome.storage.sync` pour les données globales, `chrome.storage.local` pour l'état des onglets
-- **Communication** : Messages entre content script, popup et background
-- **Permissions** : `storage`, `activeTab`, `scripting`, `host_permissions`
-- **Compatibilité** : Manifest V3, Chrome moderne
+### Recommended Test Sites
+- **News**: lemonde.fr, lefigaro.fr
+- **Blogs**: French WordPress sites
+- **Social**: French forums, comment sections
+- **Educational**: French learning websites
+
+### Test Scenarios
+1. **Word Detection**: Verify French words are highlighted correctly
+2. **API Integration**: Check translations and linguistic data
+3. **Save/Load**: Test vocabulary persistence across sessions
+4. **Performance**: Test on text-heavy pages
+5. **Cross-tab Sync**: Verify state synchronization between tabs
+
+## 🆘 Support
+
+### Common Issues
+1. **Words not highlighting**: Check if extension is activated (blue flag button)
+2. **No translations**: Verify Gemini API key is configured correctly
+3. **Performance issues**: Try refreshing the page or disabling on heavy sites
+
+### Debug Mode
+Open Chrome DevTools Console and run:
+```javascript
+// Test word analysis
+window.immerseTestAnalysis();
+
+// Check storage stats
+window.immerseFrancaisUtils.testGlobalStorage();
+
+// View saved words count
+console.log('Saved words:', window.immerseFrancaisUtils.getSavedWordsCount());
+```
 
 
 
 ---
 
-**Développé avec ❤️ pour l'apprentissage du français** 
+**Built with ❤️ for French language learners**
+
+*Transform your web browsing into an immersive French learning experience!* 
