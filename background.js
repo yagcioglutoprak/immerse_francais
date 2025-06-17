@@ -402,6 +402,8 @@ async function clearCache() {
 // Gérer la sauvegarde d'un mot (Version améliorée avec synchronisation)
 async function handleSaveWord(wordData, sendResponse) {
     try {
+        console.log('Début de la sauvegarde pour:', wordData.word);
+        
         const result = await chrome.storage.sync.get(['savedWords']);
         const savedWords = result.savedWords || {};
         
@@ -431,22 +433,25 @@ async function handleSaveWord(wordData, sendResponse) {
         // Sauvegarder dans le stockage synchronisé
         await chrome.storage.sync.set({ savedWords });
         
-        console.log('Mot sauvegardé avec succès:', wordData.word);
+        console.log('Mot sauvegardé avec succès dans le stockage:', wordData.word);
         
-        // Notifier tous les onglets de la mise à jour
-        await notifyAllTabsWordSaved(wordKey, wordInfo);
-        
+        // Envoyer la réponse immédiatement
         sendResponse({ 
             success: true, 
             data: wordInfo,
-            message: 'Mot sauvegardé et synchronisé sur tous les onglets'
+            message: 'Mot sauvegardé avec succès'
+        });
+        
+        // Notifier tous les onglets en arrière-plan (sans bloquer la réponse)
+        notifyAllTabsWordSaved(wordKey, wordInfo).catch(error => {
+            console.warn('Erreur lors de la notification aux onglets:', error);
         });
         
     } catch (error) {
         console.error('Erreur lors de la sauvegarde:', error);
         
         // Gestion d'erreur spécifique pour les limites de stockage
-        if (error.message.includes('QUOTA_BYTES_PER_ITEM')) {
+        if (error.message && error.message.includes('QUOTA_BYTES_PER_ITEM')) {
             sendResponse({ 
                 success: false, 
                 error: 'Limite de stockage atteinte. Veuillez supprimer quelques mots sauvegardés.',
@@ -455,7 +460,7 @@ async function handleSaveWord(wordData, sendResponse) {
         } else {
             sendResponse({ 
                 success: false, 
-                error: error.message,
+                error: error.message || 'Erreur inconnue lors de la sauvegarde',
                 errorType: 'SAVE_ERROR'
             });
         }

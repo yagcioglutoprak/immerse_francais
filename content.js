@@ -1242,6 +1242,12 @@ async function saveWordFromModal(word, modalElement) {
     saveButton.innerHTML = '<div class="immerse-spinner"></div> Sauvegarde...';
     saveButton.className = 'immerse-modal-button';
     
+    // Timeout de sécurité pour éviter le spinner infini
+    const timeoutId = setTimeout(() => {
+        console.warn('Timeout lors de la sauvegarde - restauration du bouton');
+        resetSaveButton(saveButton, word);
+    }, 10000); // 10 secondes de timeout
+    
     try {
         // Récupérer les données de traduction existantes si disponibles
         const translationElement = modal.querySelector('#immerse-translation');
@@ -1276,15 +1282,34 @@ async function saveWordFromModal(word, modalElement) {
             priority: priority
         };
         
-        // Envoyer au background script pour sauvegarde
-        const response = await chrome.runtime.sendMessage({
-            action: 'saveWord',
-            wordData: wordData
-        });
+        console.log('Envoi de la requête de sauvegarde pour:', word);
+        
+        // Envoyer au background script pour sauvegarde avec gestion d'erreur améliorée
+        let response;
+        try {
+            response = await chrome.runtime.sendMessage({
+                action: 'saveWord',
+                wordData: wordData
+            });
+        } catch (messageError) {
+            console.error('Erreur lors de l\'envoi du message:', messageError);
+            throw new Error('Impossible de communiquer avec le service de sauvegarde');
+        }
+        
+        // Annuler le timeout de sécurité
+        clearTimeout(timeoutId);
+        
+        console.log('Réponse reçue:', response);
+        
+        // Vérifier que la réponse existe et a le bon format
+        if (!response) {
+            throw new Error('Aucune réponse du service de sauvegarde');
+        }
         
         if (response.success) {
             // Mettre à jour le cache local avec les données retournées par le background
-            savedWords[word.toLowerCase()] = response.data;
+            const dataToSave = response.data || wordData;
+            savedWords[word.toLowerCase()] = dataToSave;
             
             // Mettre à jour le surlignage sur la page
             updateWordHighlighting(word);
@@ -1298,7 +1323,7 @@ async function saveWordFromModal(word, modalElement) {
                 closeModal();
             }, 1200);
             
-            console.log('Mot sauvegardé avec succès:', word, '- Données:', response.data);
+            console.log('Mot sauvegardé avec succès:', word, '- Données:', dataToSave);
         } else {
             throw new Error(response.error || 'Erreur lors de la sauvegarde');
         }
@@ -1306,16 +1331,26 @@ async function saveWordFromModal(word, modalElement) {
     } catch (error) {
         console.error('Erreur lors de la sauvegarde:', error);
         
+        // Annuler le timeout de sécurité
+        clearTimeout(timeoutId);
+        
         // Afficher l'erreur avec animation
         saveButton.innerHTML = '❌ Erreur de sauvegarde';
         saveButton.className = 'immerse-modal-button error';
         
         // Réactiver le bouton après un délai
         setTimeout(() => {
-            saveButton.disabled = false;
-            saveButton.innerHTML = savedWords[word.toLowerCase()] ? 'Mettre à jour' : 'Sauvegarder';
-            saveButton.className = 'immerse-modal-button';
+            resetSaveButton(saveButton, word);
         }, 3000);
+    }
+}
+
+// Fonction utilitaire pour réinitialiser le bouton de sauvegarde
+function resetSaveButton(saveButton, word) {
+    if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.innerHTML = savedWords[word.toLowerCase()] ? '💾 Mettre à jour' : '💾 Sauvegarder';
+        saveButton.className = 'immerse-modal-button-compact';
     }
 }
 
