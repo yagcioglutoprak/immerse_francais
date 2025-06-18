@@ -203,6 +203,13 @@ IMPORTANT: Retourne UNIQUEMENT le JSON, rien d'autre. Tous les champs sont OBLIG
                         }]
                     }],
                     generationConfig: {
+                        thinkingConfig: {
+                            thinkingBudget: 0
+                            // Turn off thinking:
+                            // thinkingBudget: 0
+                            // Turn on dynamic thinking:
+                            // thinkingBudget: -1
+                        },
                         temperature: 0.3,
                         topK: 1,
                         topP: 1,
@@ -399,16 +406,19 @@ async function clearCache() {
     console.log('Cache vidé manuellement');
 }
 
-// Gérer la sauvegarde d'un mot (Version améliorée avec synchronisation)
+// Gérer la sauvegarde d'un mot (Version optimisée pour éviter les quotas)
 async function handleSaveWord(wordData, sendResponse) {
     try {
         console.log('Début de la sauvegarde pour:', wordData.word);
         
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const savedWords = result.savedWords || {};
+        // Utiliser des clés individuelles pour chaque mot (éviter le quota par item)
+        const wordKey = wordData.word.toLowerCase().trim();
+        const storageKey = `word_${wordKey}`;
+        
+        // Vérifier si le mot existe déjà
+        const existingData = await chrome.storage.sync.get([storageKey]);
         
         // Préparer les données avec la structure complète
-        const wordKey = wordData.word.toLowerCase().trim();
         const wordInfo = {
             userNote: wordData.userNote || '',
             translation: wordData.translation || '',
@@ -422,16 +432,19 @@ async function handleSaveWord(wordData, sendResponse) {
             priority: wordData.priority || 0, // 0-5 étoiles
             tags: wordData.tags || [], // Array de tags générés par Gemini (max 3)
             // Métadonnées
-            dateAdded: savedWords[wordKey]?.dateAdded || new Date().toISOString(),
+            dateAdded: existingData[storageKey]?.dateAdded || new Date().toISOString(),
             dateModified: new Date().toISOString(),
-            reviewCount: (savedWords[wordKey]?.reviewCount || 0) + 1,
+            reviewCount: (existingData[storageKey]?.reviewCount || 0) + 1,
             originalWord: wordData.word // Garder la casse originale
         };
         
-        savedWords[wordKey] = wordInfo;
+        // Sauvegarder le mot individuellement
+        const storageData = {};
+        storageData[storageKey] = wordInfo;
+        await chrome.storage.sync.set(storageData);
         
-        // Sauvegarder dans le stockage synchronisé
-        await chrome.storage.sync.set({ savedWords });
+        // Maintenir un index des mots sauvegardés (pour la compatibilité)
+        await updateWordsIndex(wordKey, true);
         
         console.log('Mot sauvegardé avec succès dans le stockage:', wordData.word);
         
@@ -451,10 +464,10 @@ async function handleSaveWord(wordData, sendResponse) {
         console.error('Erreur lors de la sauvegarde:', error);
         
         // Gestion d'erreur spécifique pour les limites de stockage
-        if (error.message && error.message.includes('QUOTA_BYTES_PER_ITEM')) {
+        if (error.message && (error.message.includes('QUOTA_BYTES_PER_ITEM') || error.message.includes('QUOTA_BYTES'))) {
             sendResponse({ 
                 success: false, 
-                error: 'Limite de stockage atteinte. Veuillez supprimer quelques mots sauvegardés.',
+                error: 'Limite de stockage atteinte. Veuillez supprimer quelques mots sauvegardés ou exporter vos données.',
                 errorType: 'STORAGE_QUOTA_EXCEEDED'
             });
         } else {
@@ -467,17 +480,59 @@ async function handleSaveWord(wordData, sendResponse) {
     }
 }
 
-// Gérer la récupération des mots sauvegardés (Version améliorée)
+// Maintenir un index des mots sauvegardés
+async function updateWordsIndex(wordKey, isAdd) {
+    try {
+        const result = await chrome.storage.sync.get(['wordsIndex']);
+        let wordsIndex = result.wordsIndex || [];
+        
+        if (isAdd && !wordsIndex.includes(wordKey)) {
+            wordsIndex.push(wordKey);
+        } else if (!isAdd && wordsIndex.includes(wordKey)) {
+            wordsIndex = wordsIndex.filter(key => key !== wordKey);
+        }
+        
+        await chrome.storage.sync.set({ wordsIndex });
+    } catch (error) {
+        console.warn('Erreur lors de la mise à jour de l\'index:', error);
+    }
+}
+
+// Gérer la récupération des mots sauvegardés (Version optimisée)
 async function handleGetSavedWords(sendResponse) {
     try {
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const savedWords = result.savedWords || {};
+        // D'abord, essayer l'ancien format pour la migration
+        const legacyResult = await chrome.storage.sync.get(['savedWords']);
+        if (legacyResult.savedWords && Object.keys(legacyResult.savedWords).length > 0) {
+            console.log('Migration des données de l\'ancien format...');
+            await migrateLegacyData(legacyResult.savedWords);
+        }
         
-        // Ajouter des statistiques utiles
+        // Récupérer l'index des mots
+        const indexResult = await chrome.storage.sync.get(['wordsIndex']);
+        const wordsIndex = indexResult.wordsIndex || [];
+        
+        // Récupérer tous les mots individuellement
+        const wordKeys = wordsIndex.map(wordKey => `word_${wordKey}`);
+        const wordsData = await chrome.storage.sync.get(wordKeys);
+        
+        // Reconstruire l'objet savedWords pour la compatibilité
+        const savedWords = {};
+        for (const wordKey of wordsIndex) {
+            const storageKey = `word_${wordKey}`;
+            if (wordsData[storageKey]) {
+                savedWords[wordKey] = wordsData[storageKey];
+            }
+        }
+        
+        // Calculer les statistiques
+        const wordValues = Object.values(savedWords);
         const stats = {
-            totalWords: Object.keys(savedWords).length,
+            totalWords: wordValues.length,
             totalStorage: JSON.stringify(savedWords).length,
-            lastModified: Math.max(...Object.values(savedWords).map(w => new Date(w.dateModified || w.dateAdded).getTime()))
+            lastModified: wordValues.length > 0 ? 
+                Math.max(...wordValues.map(w => new Date(w.dateModified || w.dateAdded).getTime())) : 
+                0
         };
         
         sendResponse({ 
@@ -552,15 +607,50 @@ async function notifyAllTabsWordSaved(wordKey, wordInfo) {
     }
 }
 
-// Supprimer un mot sauvegardé
+// Migrer les données de l'ancien format vers le nouveau
+async function migrateLegacyData(legacySavedWords) {
+    try {
+        console.log('Début de la migration des données...');
+        
+        const wordsIndex = [];
+        const storageOperations = [];
+        
+        // Convertir chaque mot vers le nouveau format
+        for (const [wordKey, wordData] of Object.entries(legacySavedWords)) {
+            wordsIndex.push(wordKey);
+            const storageKey = `word_${wordKey}`;
+            const storageData = {};
+            storageData[storageKey] = wordData;
+            storageOperations.push(chrome.storage.sync.set(storageData));
+        }
+        
+        // Sauvegarder l'index
+        storageOperations.push(chrome.storage.sync.set({ wordsIndex }));
+        
+        // Exécuter toutes les opérations
+        await Promise.all(storageOperations);
+        
+        // Supprimer l'ancien format après migration réussie
+        await chrome.storage.sync.remove(['savedWords']);
+        
+        console.log(`Migration réussie: ${wordsIndex.length} mots migrés`);
+        
+    } catch (error) {
+        console.error('Erreur lors de la migration:', error);
+        throw error;
+    }
+}
+
+// Supprimer un mot sauvegardé (Version optimisée)
 async function handleDeleteWord(word, sendResponse) {
     try {
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const savedWords = result.savedWords || {};
-        
         const wordKey = word.toLowerCase().trim();
+        const storageKey = `word_${wordKey}`;
         
-        if (!savedWords[wordKey]) {
+        // Vérifier si le mot existe
+        const existingData = await chrome.storage.sync.get([storageKey]);
+        
+        if (!existingData[storageKey]) {
             sendResponse({ 
                 success: false, 
                 error: 'Mot non trouvé dans les mots sauvegardés',
@@ -569,11 +659,11 @@ async function handleDeleteWord(word, sendResponse) {
             return;
         }
         
-        // Supprimer le mot
-        delete savedWords[wordKey];
+        // Supprimer le mot du stockage
+        await chrome.storage.sync.remove([storageKey]);
         
-        // Sauvegarder les modifications
-        await chrome.storage.sync.set({ savedWords });
+        // Mettre à jour l'index
+        await updateWordsIndex(wordKey, false);
         
         console.log('Mot supprimé avec succès:', word);
         
@@ -620,19 +710,48 @@ async function notifyAllTabsWordDeleted(wordKey) {
     }
 }
 
-// Obtenir les statistiques de stockage
+// Obtenir les statistiques de stockage (Version optimisée)
 async function handleGetStorageStats(sendResponse) {
     try {
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const savedWords = result.savedWords || {};
+        // Récupérer l'index des mots et tous les mots
+        const indexResult = await chrome.storage.sync.get(['wordsIndex']);
+        const wordsIndex = indexResult.wordsIndex || [];
+        
+        if (wordsIndex.length === 0) {
+            sendResponse({ 
+                success: true, 
+                data: {
+                    totalWords: 0,
+                    storageSize: 0,
+                    maxSize: chrome.storage.sync.QUOTA_BYTES || 102400,
+                    storagePercentage: 0,
+                    topWords: [],
+                    recentWords: []
+                }
+            });
+            return;
+        }
+        
+        // Récupérer tous les mots
+        const wordKeys = wordsIndex.map(wordKey => `word_${wordKey}`);
+        const wordsData = await chrome.storage.sync.get(wordKeys);
+        
+        // Reconstruire l'objet pour les calculs
+        const savedWords = {};
+        for (const wordKey of wordsIndex) {
+            const storageKey = `word_${wordKey}`;
+            if (wordsData[storageKey]) {
+                savedWords[wordKey] = wordsData[storageKey];
+            }
+        }
         
         const totalWords = Object.keys(savedWords).length;
         const storageSize = new Blob([JSON.stringify(savedWords)]).size;
         const maxSize = chrome.storage.sync.QUOTA_BYTES || 102400; // 100KB par défaut
         
-        // Calculer les mots les plus fréquents
+        // Calculer les mots les plus fréquents (en utilisant reviewCount au lieu de frequency)
         const wordsByFrequency = Object.entries(savedWords)
-            .sort((a, b) => (b[1].frequency || 0) - (a[1].frequency || 0))
+            .sort((a, b) => (b[1].reviewCount || 0) - (a[1].reviewCount || 0))
             .slice(0, 10);
         
         // Calculer les mots récents
@@ -647,7 +766,7 @@ async function handleGetStorageStats(sendResponse) {
             storagePercentage: Math.round((storageSize / maxSize) * 100),
             topWords: wordsByFrequency.map(([word, data]) => ({
                 word,
-                frequency: data.frequency || 0,
+                frequency: data.reviewCount || 0,
                 userNote: data.userNote
             })),
             recentWords: recentWords.map(([word, data]) => ({
@@ -669,15 +788,29 @@ async function handleGetStorageStats(sendResponse) {
     }
 }
 
-// Exporter les mots sauvegardés
+// Exporter les mots sauvegardés (Version optimisée)
 async function handleExportWords(sendResponse) {
     try {
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const savedWords = result.savedWords || {};
+        // Récupérer l'index des mots
+        const indexResult = await chrome.storage.sync.get(['wordsIndex']);
+        const wordsIndex = indexResult.wordsIndex || [];
+        
+        // Récupérer tous les mots
+        const wordKeys = wordsIndex.map(wordKey => `word_${wordKey}`);
+        const wordsData = await chrome.storage.sync.get(wordKeys);
+        
+        // Reconstruire l'objet des mots sauvegardés
+        const savedWords = {};
+        for (const wordKey of wordsIndex) {
+            const storageKey = `word_${wordKey}`;
+            if (wordsData[storageKey]) {
+                savedWords[wordKey] = wordsData[storageKey];
+            }
+        }
         
         const exportData = {
             exportDate: new Date().toISOString(),
-            version: '1.0',
+            version: '2.0', // Nouvelle version pour indiquer le nouveau format
             totalWords: Object.keys(savedWords).length,
             words: savedWords
         };
@@ -698,7 +831,7 @@ async function handleExportWords(sendResponse) {
     }
 }
 
-// Importer des mots sauvegardés
+// Importer des mots sauvegardés (Version optimisée)
 async function handleImportWords(importData, sendResponse) {
     try {
         if (!importData || !importData.words) {
@@ -710,37 +843,62 @@ async function handleImportWords(importData, sendResponse) {
             return;
         }
         
-        const result = await chrome.storage.sync.get(['savedWords']);
-        const currentWords = result.savedWords || {};
+        // Récupérer l'index actuel et tous les mots existants
+        const indexResult = await chrome.storage.sync.get(['wordsIndex']);
+        const currentWordsIndex = indexResult.wordsIndex || [];
+        
+        const existingWordKeys = currentWordsIndex.map(wordKey => `word_${wordKey}`);
+        const existingWordsData = await chrome.storage.sync.get(existingWordKeys);
         
         let newWordsCount = 0;
         let updatedWordsCount = 0;
+        const newWordsIndex = [...currentWordsIndex];
+        const storageOperations = [];
         
         // Fusionner les données
         for (const [wordKey, wordData] of Object.entries(importData.words)) {
-            if (currentWords[wordKey]) {
+            const storageKey = `word_${wordKey}`;
+            const existingData = existingWordsData[storageKey];
+            
+            if (existingData) {
                 // Garder la date la plus récente
-                const currentDate = new Date(currentWords[wordKey].dateModified || currentWords[wordKey].dateAdded);
+                const currentDate = new Date(existingData.dateModified || existingData.dateAdded);
                 const importDate = new Date(wordData.dateModified || wordData.dateAdded);
                 
                 if (importDate > currentDate) {
-                    currentWords[wordKey] = {
+                    const updatedWordData = {
                         ...wordData,
                         dateModified: new Date().toISOString()
                     };
+                    const storageData = {};
+                    storageData[storageKey] = updatedWordData;
+                    storageOperations.push(chrome.storage.sync.set(storageData));
                     updatedWordsCount++;
                 }
             } else {
-                currentWords[wordKey] = {
+                // Nouveau mot
+                const newWordData = {
                     ...wordData,
                     dateModified: new Date().toISOString()
                 };
+                const storageData = {};
+                storageData[storageKey] = newWordData;
+                storageOperations.push(chrome.storage.sync.set(storageData));
+                
+                if (!newWordsIndex.includes(wordKey)) {
+                    newWordsIndex.push(wordKey);
+                }
                 newWordsCount++;
             }
         }
         
-        // Sauvegarder les données fusionnées
-        await chrome.storage.sync.set({ savedWords: currentWords });
+        // Mettre à jour l'index si nécessaire
+        if (newWordsCount > 0) {
+            storageOperations.push(chrome.storage.sync.set({ wordsIndex: newWordsIndex }));
+        }
+        
+        // Exécuter toutes les opérations de stockage
+        await Promise.all(storageOperations);
         
         // Notifier tous les onglets de la mise à jour
         await notifyAllTabsWordsUpdated();
@@ -750,18 +908,28 @@ async function handleImportWords(importData, sendResponse) {
             data: {
                 newWords: newWordsCount,
                 updatedWords: updatedWordsCount,
-                totalWords: Object.keys(currentWords).length
+                totalWords: newWordsIndex.length
             },
             message: `Importation réussie: ${newWordsCount} nouveaux mots, ${updatedWordsCount} mots mis à jour`
         });
         
     } catch (error) {
         console.error('Erreur lors de l\'importation:', error);
-        sendResponse({ 
-            success: false, 
-            error: error.message,
-            errorType: 'IMPORT_ERROR'
-        });
+        
+        // Gestion spécifique des erreurs de quota
+        if (error.message && (error.message.includes('QUOTA_BYTES') || error.message.includes('QUOTA_BYTES_PER_ITEM'))) {
+            sendResponse({ 
+                success: false, 
+                error: 'Limite de stockage atteinte lors de l\'importation. Veuillez supprimer quelques mots avant de réessayer.',
+                errorType: 'STORAGE_QUOTA_EXCEEDED'
+            });
+        } else {
+            sendResponse({ 
+                success: false, 
+                error: error.message,
+                errorType: 'IMPORT_ERROR'
+            });
+        }
     }
 }
 
