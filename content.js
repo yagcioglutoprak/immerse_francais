@@ -163,14 +163,45 @@ function setupDOMObserver() {
     console.log('Observateur DOM configuré avec protection anti-clignotement');
 }
 
-// Charger les mots sauvegardés depuis le stockage
+// Charger les mots sauvegardés depuis le stockage (compatible avec le nouveau format)
 async function loadSavedWords() {
     try {
-        const result = await chrome.storage.sync.get(['savedWords']);
-        savedWords = result.savedWords || {};
-        console.log('Mots sauvegardés chargés:', Object.keys(savedWords).length);
+        // D'abord, essayer l'ancien format pour la migration
+        const legacyResult = await chrome.storage.sync.get(['savedWords']);
+        if (legacyResult.savedWords && Object.keys(legacyResult.savedWords).length > 0) {
+            console.log('Utilisation de l\'ancien format de stockage');
+            savedWords = legacyResult.savedWords;
+            console.log('Mots sauvegardés chargés (ancien format):', Object.keys(savedWords).length);
+            return;
+        }
+        
+        // Utiliser le nouveau format optimisé
+        const indexResult = await chrome.storage.sync.get(['wordsIndex']);
+        const wordsIndex = indexResult.wordsIndex || [];
+        
+        if (wordsIndex.length === 0) {
+            savedWords = {};
+            console.log('Aucun mot sauvegardé trouvé');
+            return;
+        }
+        
+        // Récupérer tous les mots individuellement
+        const wordKeys = wordsIndex.map(wordKey => `word_${wordKey}`);
+        const wordsData = await chrome.storage.sync.get(wordKeys);
+        
+        // Reconstruire l'objet savedWords
+        savedWords = {};
+        for (const wordKey of wordsIndex) {
+            const storageKey = `word_${wordKey}`;
+            if (wordsData[storageKey]) {
+                savedWords[wordKey] = wordsData[storageKey];
+            }
+        }
+        
+        console.log('Mots sauvegardés chargés (nouveau format):', Object.keys(savedWords).length);
     } catch (error) {
         console.error('Erreur lors du chargement des mots sauvegardés:', error);
+        savedWords = {};
     }
 }
 
@@ -210,7 +241,8 @@ async function loadActivationState() {
         if (globalState && globalState.isActive) {
             isExtensionActive = true;
             updateButtonState(true);
-            // Si l'extension était active, surligner automatiquement les mots
+            // Si l'extension était active, recharger les mots puis surligner
+            await loadSavedWords();
             analyzeAndHighlightWords();
         } else {
             isExtensionActive = false;
@@ -261,7 +293,8 @@ async function toggleExtensionState() {
     await saveActivationState();
     
     if (isExtensionActive) {
-        console.log('Extension activée - Analyse des mots...');
+        console.log('Extension activée - Rechargement des mots...');
+        await loadSavedWords();
         analyzeAndHighlightWords();
     } else {
         console.log('Extension désactivée - Nettoyage du surlignage...');
@@ -954,22 +987,22 @@ function positionModalNearElement(modalElement, targetElement) {
     let left = targetRect.right + scrollX + 10;
     let top = targetRect.top + scrollY - 10;
     
-    // Vérifier si la modal dépasse de l'écran à droite (nouvelle largeur: 580px)
-    if (left + 580 > windowWidth + scrollX) {
+    // Vérifier si la modal dépasse de l'écran à droite (nouvelle largeur: 480px)
+    if (left + 480 > windowWidth + scrollX) {
         // Placer à gauche du mot
-        left = targetRect.left + scrollX - 590;
+        left = targetRect.left + scrollX - 490;
     }
     
     // Vérifier si la modal dépasse encore à gauche
     if (left < scrollX + 10) {
         // Centrer horizontalement sur l'écran
-        left = scrollX + (windowWidth - 580) / 2;
+        left = scrollX + (windowWidth - 480) / 2;
     }
     
-    // Vérifier si la modal dépasse en bas (nouvelle hauteur: 480px)
-    if (top + 480 > windowHeight + scrollY) {
+    // Vérifier si la modal dépasse en bas (nouvelle hauteur: 400px)
+    if (top + 400 > windowHeight + scrollY) {
         // Placer au-dessus du mot
-        top = targetRect.top + scrollY - 490;
+        top = targetRect.top + scrollY - 410;
     }
     
     // Vérifier si la modal dépasse en haut
@@ -1123,12 +1156,12 @@ async function prefillAllWordData(word) {
 
 // Charger la traduction via l'API Gemini
 async function loadTranslation(word) {
+    // Créer un identifiant unique pour cette requête (déclaré ici pour être accessible dans finally)
+    const requestId = Date.now() + '-' + Math.random();
+    currentTranslationRequest = requestId;
+    
     try {
         console.log('Demande de traduction pour:', word);
-        
-        // Créer un identifiant unique pour cette requête
-        const requestId = Date.now() + '-' + Math.random();
-        currentTranslationRequest = requestId;
         
         // Envoyer la demande au background script
         const response = await chrome.runtime.sendMessage({
@@ -1576,15 +1609,62 @@ async function testGlobalStorage() {
     console.log('🏁 Test du stockage global terminé');
 }
 
+// Fonction de test pour vérifier la persistance des mots
+async function testWordPersistence() {
+    console.log('🔬 Test de persistance des mots sauvegardés...');
+    
+    try {
+        // Forcer le rechargement depuis le stockage
+        console.log('📥 Rechargement forcé depuis le stockage...');
+        await loadSavedWords();
+        
+        console.log('💾 Mots actuellement en mémoire:', Object.keys(savedWords).length);
+        if (Object.keys(savedWords).length > 0) {
+            console.log('🔍 Premiers mots:', Object.keys(savedWords).slice(0, 5));
+            
+            // Vérifier le contenu d'un mot au hasard
+            const firstWord = Object.keys(savedWords)[0];
+            const wordData = savedWords[firstWord];
+            console.log(`📝 Données du mot "${firstWord}":`, {
+                userNote: wordData.userNote,
+                translation: wordData.translation,
+                dateAdded: wordData.dateAdded
+            });
+        } else {
+            console.log('⚠️ Aucun mot trouvé - possible problème de stockage');
+        }
+        
+        // Tester l'accès direct au stockage
+        console.log('🔧 Test d\'accès direct au stockage...');
+        const directResult = await chrome.storage.sync.get(null);
+        const allKeys = Object.keys(directResult);
+        const wordKeys = allKeys.filter(key => key.startsWith('word_'));
+        console.log(`📊 Clés totales dans le stockage: ${allKeys.length}`);
+        console.log(`📊 Clés de mots individuels: ${wordKeys.length}`);
+        console.log(`📊 Index des mots:`, directResult.wordsIndex);
+        
+        if (wordKeys.length > 0) {
+            console.log('✅ Les mots sont bien présents dans le stockage Chrome');
+        } else {
+            console.log('❌ Aucun mot trouvé dans le stockage Chrome');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du test de persistance:', error);
+    }
+}
+
 // Exposer les fonctions utilitaires globalement pour les tests
 window.immerseFrancaisUtils = {
     getStorageStats,
     exportSavedWords,
     deleteSavedWord,
     testGlobalStorage,
+    testWordPersistence,
     getSavedWordsCount: () => Object.keys(savedWords).length,
     isWordSaved: (word) => savedWords.hasOwnProperty(word.toLowerCase()),
-    getSavedWords: () => savedWords
+    getSavedWords: () => savedWords,
+    reloadWords: loadSavedWords
 };
 
 // Démarrer l'extension quand le DOM est prêt

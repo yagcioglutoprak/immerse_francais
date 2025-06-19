@@ -87,8 +87,8 @@ async function initializeDefaultData() {
         if (!result.extensionSettings) {
             await chrome.storage.sync.set({
                 extensionSettings: {
-                    activeColor: '#E3F2FD', // Bleu clair pour mots non sauvegardés
-                    savedColor: '#E8F5E8',  // Vert clair pour mots sauvegardés
+                    activeColor: 'rgba(25, 118, 210, 0.03)', // Bleu très subtil pour mots non sauvegardés
+                    savedColor: 'rgba(76, 175, 80, 0.08)',   // Vert plus visible pour mots sauvegardés
                     tooltipDelay: 500
                 }
             });
